@@ -1,0 +1,8 @@
+/home/serenade/Desktop/sdvHotdogChamp/bin/Debug/net6.0/sdvHotdogChamp.deps.json
+/home/serenade/Desktop/sdvHotdogChamp/bin/Debug/net6.0/sdvHotdogChamp.dll
+/home/serenade/Desktop/sdvHotdogChamp/obj/Debug/net6.0/sdvHotdogChamp.csproj.AssemblyReference.cache
+/home/serenade/Desktop/sdvHotdogChamp/obj/Debug/net6.0/sdvHotdogChamp.GeneratedMSBuildEditorConfig.editorconfig
+/home/serenade/Desktop/sdvHotdogChamp/obj/Debug/net6.0/sdvHotdogChamp.AssemblyInfoInputs.cache
+/home/serenade/Desktop/sdvHotdogChamp/obj/Debug/net6.0/sdvHotdogChamp.AssemblyInfo.cs
+/home/serenade/Desktop/sdvHotdogChamp/obj/Debug/net6.0/sdvHotdogChamp.csproj.CoreCompileInputs.cache
+/home/serenade/Desktop/sdvHotdogChamp/obj/Debug/net6.0/sdvHotdogChamp.dll

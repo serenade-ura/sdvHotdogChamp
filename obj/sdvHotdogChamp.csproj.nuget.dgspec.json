@@ -1,0 +1,74 @@
+{
+  "format": 1,
+  "restore": {
+    "/home/serenade/Desktop/sdvHotdogChamp/sdvHotdogChamp.csproj": {}
+  },
+  "projects": {
+    "/home/serenade/Desktop/sdvHotdogChamp/sdvHotdogChamp.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/home/serenade/Desktop/sdvHotdogChamp/sdvHotdogChamp.csproj",
+        "projectName": "sdvHotdogChamp",
+        "projectPath": "/home/serenade/Desktop/sdvHotdogChamp/sdvHotdogChamp.csproj",
+        "packagesPath": "/home/serenade/.nuget/packages/",
+        "outputPath": "/home/serenade/Desktop/sdvHotdogChamp/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/home/serenade/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net6.0"
+        ],
+        "sources": {
+          "/usr/lib/dotnet/library-packs": {},
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net6.0": {
+            "targetAlias": "net6.0",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "10.0.100"
+      },
+      "frameworks": {
+        "net6.0": {
+          "targetAlias": "net6.0",
+          "dependencies": {
+            "Pathoschild.Stardew.ModBuildConfig": {
+              "target": "Package",
+              "version": "[4.4.0, )"
+            }
+          },
+          "imports": [
+            "net461",
+            "net462",
+            "net47",
+            "net471",
+            "net472",
+            "net48",
+            "net481"
+          ],
+          "assetTargetFallback": true,
+          "warn": true,
+          "frameworkReferences": {
+            "Microsoft.NETCore.App": {
+              "privateAssets": "all"
+            }
+          },
+          "runtimeIdentifierGraphPath": "/usr/lib/dotnet/sdk/10.0.107/RuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

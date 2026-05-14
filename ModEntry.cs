@@ -1,0 +1,307 @@
+using System;
+using System.Drawing;
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Input;
+using StardewModdingAPI;
+using StardewModdingAPI.Events;
+using StardewModdingAPI.Utilities;
+using StardewValley;
+using Color = Microsoft.Xna.Framework.Color;
+using healList; // Contains the Edibles class. I don't know if this is the "right" way to do it but its the only way that would work... But I think I just fucked up the first time.
+
+namespace sdvHotdogChamp
+{
+	 /// <summary>The mod entry point.</summary>
+    public class ModEntry : Mod
+    {      
+			
+		// objects apparently?
+		public static Texture2D hungyMeter;
+		public static Texture2D hungyMeterFiller;
+		public static Texture2D thorstMeter;
+		public static Texture2D thorstMeterFiller;
+		public Edibles healValues = new Edibles(); // Make an object of the class here so we can use it later.
+		
+		public static string ToolUsedName;
+		public static bool AlreadyUsingTool;
+		public static bool AlreadyEating;
+		
+		
+		// Variables used in the Bars code.
+		// Theoretically this should be all it ever needs?
+		public static float currentThirst = 100; // Initializing the hunger and thirst values as 100 because drawing the bar will be a lot easier if I'm dividing by 100 rather than dividing by 0.
+		public static float currentHunger = 100; // So rather than "hunger" and "thirst" its more like fullness and uh... quenched I guess.
+		public static float maxHunger = 100; // Maximum reachable thirst and hunger. If current == these, you're maxed out.
+		public static float maxThirst = 100; // Since the maximum is 100, maybe I would never be trying to divide by 0 but idgaf
+		public static Color hungerColor = new Color(1, .7f, 0); // Honestly no clue what these colors are but its what survivalistic used.
+        public static Color thirstColor = new Color(0,.7f, 1);
+        
+        
+        public override void Entry(IModHelper helper)
+        {
+                       
+			//hungyMeterFiller = new Texture2D(Game1.graphics.GraphicsDevice, 1, 1);   
+			//thorstMeterFiller = new Texture2D(Game1.graphics.GraphicsDevice, 1, 1);     
+			hungyMeterFiller = helper.ModContent.Load<Texture2D>("assets/hungyFiller.png");
+			thorstMeterFiller = helper.ModContent.Load<Texture2D>("assets/thorstFiller.png");
+			hungyMeter = helper.ModContent.Load<Texture2D>("assets/hungy.png");
+			hungyMeter.Name = "hungyMeter";
+			thorstMeter = helper.ModContent.Load<Texture2D>("assets/thorst.png");
+			thorstMeter.Name = "thorstMeter";
+			// Event Handler for the Rednered Event, calling "DrawBars" function.
+			helper.Events.Display.RenderingHud += this.DrawBars;
+			helper.Events.GameLoop.TimeChanged += this.ProcessHunger;
+			helper.Events.GameLoop.UpdateTicked += this.CheckToolUse;
+			helper.Events.GameLoop.UpdateTicked += this.CheckEatedGoods;
+          
+		}
+        
+		
+		// Functions can be called via event handlers
+		// The params are always "object? sender," and then "xEventArgs e" where x=The Event name... At least, it seems that way. Just coming up with a name doesn't work.
+		#nullable enable
+		public void DrawBars(object? sender, RenderingHudEventArgs e)
+		{
+			if (!Context.IsWorldReady || Game1.eventUp) // Let's not do this until the world is ready or else this draws on the title screen.
+			return;
+			
+			// Get the current size of the UI
+			Vector2 UIsize = new Vector2(Game1.uiViewport.Width, Game1.uiViewport.Height);
+			
+			
+			// Set up a vector for the hunger bar position.
+			// -171 and -240 come from survivalistic. I have no idea how he got these numbers unless it was just guess and check.
+			// Using the Y value of the UI size draws these to the left of the toolbar.
+			// We'll do this conditionally, depending on if the player is somewhere that the health bar renders.
+			
+			int offset;
+			bool inDanger;
+			string area = Game1.player.currentLocation.Name;
+			// According to some rendering rules in Survivalistic, these three areas are dangerous. I only know about the mine. Fuck do you mean "skull cavern"? I heard there's goblin village...
+			if (area.Contains("UndergroundMine") || (area.Contains("VolcanoDungeon") && area != ("VolcanoDungeon0")) || area.Contains("SkullCavern"))
+			{
+				inDanger = true;
+			}
+			else
+			{
+				inDanger = false;
+			}
+			// boy I love if and else, it would be a shame if some other conditional existed that is somewhat more memory efficient for large groups of items and I never used it
+			if(inDanger)
+			{  
+				offset = 230;
+			}
+			else
+			{
+				offset = 171;
+			}
+			Vector2 hungerBarPosition = new Vector2((int)(UIsize.X-offset), (int)(UIsize.Y-240));
+			// Set up a vector for the thirst bar position as well. This draws it right next to the hunger bar.
+			Vector2 thirstBarPosition = new Vector2(hungerBarPosition.X+(4*hungyMeter.Width)+ 8, hungerBarPosition.Y);
+			
+			
+			
+			// This actually draws the hunger bar or whatever other sprite you want to draw. 
+			// The format is (sprite asset, vector position, source rectangle (whatever that means), the color (whatever that does), the rotation of the sprite (if any), the scale (1 is the original sprite size), Sprite effects (whatever that is...), and finally the layer depth... Whatever that is.)
+			// The scale is 4, if you want it to match the inbuilt UI scale... I guess? It works.
+			Game1.spriteBatch.Draw(hungyMeter, hungerBarPosition, null, Color.White, 0, Vector2.Zero, 4, SpriteEffects.None, 1);
+			Game1.spriteBatch.Draw(thorstMeter, thirstBarPosition, null,	Color.White, 0, Vector2.Zero, 4, SpriteEffects.None, 1);
+			
+			// Here we calculate a percentage to draw the dynamic part of the bars.
+			// ... it might be horrendous to do these calculations here in the render step. I didn't make the game so I don't actually know.
+			float hungyPercentage = hungyPercent(currentHunger, maxHunger);
+			float thorstPercentage = thorstPercent(currentThirst, maxThirst);
+			// They become part of the rectangle.
+			// Some of this is probably scumbag code but I was just holding it for a friend, I swear.
+			
+			Game1.spriteBatch.Draw(thorstMeterFiller, new Vector2(thirstBarPosition.X + 36, thirstBarPosition.Y + (thorstMeter.Height * 4) - 8), new Microsoft.Xna.Framework.Rectangle(0, 0, thorstMeterFiller.Width * Game1.pixelZoom, (int)thorstPercentage), thirstColor, 3.138997f, new Vector2(0.5f, 0.5f), 1f, SpriteEffects.None, 1f);
+			Game1.spriteBatch.Draw(hungyMeterFiller, new Vector2(hungerBarPosition.X + 36, hungerBarPosition.Y + (hungyMeter.Height * 4) - 8), new Microsoft.Xna.Framework.Rectangle(0, 0, hungyMeterFiller.Width * Game1.pixelZoom, (int)hungyPercentage), hungerColor, 3.138997f, new Vector2(0.5f, 0.5f), 1f, SpriteEffects.None, 1f);
+
+			
+			// Do the tooltip show when you hover the mouse
+			hungerThirstHover(hungerBarPosition, hungyMeter);
+			hungerThirstHover(thirstBarPosition, thorstMeter);
+			
+			
+			
+		}
+		#nullable disable
+		// There might not be a reason to make these have a return value, but I'm doing it anyway. Feels more trackable.
+		public float hungyPercent(float currentHungy, float maxHungy)
+		{
+			float hungyAmt = (currentHungy / maxHungy) * 168; // I have no idea why this guy used 168 here, maybe it'll make sense to me if I think about it harder.
+			return hungyAmt;
+		}
+		public float thorstPercent(float currentThorsty, float maxThorsty)
+		{
+			float thorstAmt = (currentThorsty / maxThorsty) * 168; // Ok I thought about it harder, this is approximately the size of the internal bar area (where the bar will fill) times 4.
+			return thorstAmt; // So at full, these bars render as 1*168 = 168 pixels high. As the division becomes more lopsided, that height shrinks.
+		}
+		
+		// Essentially lifted from Survivalistic, once more.
+		// Well, not copied and pasted since that never pays off. The logic is stolen but the code is mine.
+		// Honestly most of the logic is mine too because Survivalistic Rebooted seems to have been coded by the type of guy who thinks needless complexity is how you're supposed to program
+		// That's exactly what they teach you in college!
+		public void hungerThirstHover(Vector2 barPosition, Texture2D sprite)
+		{
+			Vector2 mousePosition = new Vector2(Game1.getMousePosition(true).X, Game1.getMousePosition(true).Y); // Why does the get mouse position function take a bool? I'm sure there's a good reason but its just kind of odd.
+			
+			if (mousePosition.X >= barPosition.X && mousePosition.X <= (barPosition.X + sprite.Width * 4) && mousePosition.Y-240 >= (barPosition.Y - 240) && mousePosition.Y-240 <= ((barPosition.Y - 240) + sprite.Height * 4))
+			{
+				// Doing some really experimental shit here. Name is apparently not populated by default (hence why I populated it way at the top) and presumably it sticks.
+				if (sprite.Name == "hungyMeter")
+				{
+					showBarTooltip("hunger", barPosition, sprite);
+				}
+				if (sprite.Name == "thorstMeter")
+				{
+					showBarTooltip("thirst", barPosition, sprite);
+				}
+			}
+		}
+		
+		// Continuing down the functions to display numbers pipeline.
+		// I keep having to send bar position and sprite through these functions and its making me almost slightly sort of maybe consider how classes would help here but I'm just set in my ways.
+		#nullable enable
+		public void showBarTooltip(string type, Vector2 barPosition, Texture2D sprite)
+		{
+			string Info = " ";
+			if (type == "hunger")
+			{
+				Info = $"{(int)currentHunger}/{(int)maxHunger}";
+				
+			}
+			if (type == "thirst")
+			{
+				float curThirst = (float)Math.Round(currentThirst, 0);
+				Info = $"{(int)curThirst}/{(int)maxThirst}";
+			}
+			Vector2 textSizeInfo = Game1.dialogueFont.MeasureString(Info);
+			Vector2 textPositionInfo = new Vector2 (-12, textSizeInfo.X);
+			
+			Game1.spriteBatch.DrawString(Game1.dialogueFont, Info, new Vector2 (barPosition.X + textPositionInfo.X, barPosition.Y + 49 + sprite.Height * 4 / (4 + 8)), Color.White, 0f, new Vector2(textPositionInfo.Y, 0), 1, SpriteEffects.None, 0f);
+			
+		}
+		
+		public void CheckToolUse(object? sender, UpdateTickedEventArgs e)
+		{	
+			if (!Context.IsWorldReady)
+			{
+				return;
+			}
+					
+			if (Game1.player.UsingTool)
+			{
+				ToolUsedName = Game1.player.CurrentTool.BaseName;
+				AlreadyUsingTool = true;
+			}
+			else
+			{
+				if (AlreadyUsingTool)
+				{
+					AlreadyUsingTool = false; // Presumably this is because the update ticked goes too fast.
+					ProcessThirst(ToolUsedName);
+				}
+			}
+		}
+		
+		
+		public void CheckEatedGoods(object? sender, UpdateTickedEventArgs e)
+		{	
+			if (!Context.IsWorldReady)
+			{
+				return;
+			}
+			
+			var eatenObject = (Game1.player.itemToEat);	// Survivalistic code. Who knows!
+			if (Game1.player.isEating)
+			{
+				AlreadyEating = true;
+			}
+			else
+			{
+				if (AlreadyEating)
+				{
+					AlreadyEating = false; // Presumably this is because the update ticked goes too fast.
+					recoverHungerAndThirst(eatenObject);
+				}
+			}
+		}
+		
+		public void ProcessHunger(object? sender, TimeChangedEventArgs e)
+		{
+			if (!Context.IsWorldReady || Game1.eventUp) // Let's not do this until the world is ready or else this draws on the title screen.
+			return;
+			// Hunger gradually depletes over the course of the day, rather than by activity. Stardew protag does not seem to be Goku so hunger should not be a second stamina or health bar.
+			currentHunger -= 1;
+			// We lose one hunger per 10 in game minutes. God damn tragedy. So it'll take 1000 minutes to be running on empty. If there's 60 minutes per hour, that's definitely over 10 hours. 
+			// Almost 20, in fact! It isn't an even number, unfortunately. 
+			
+		}
+		#nullable disable
+		
+		public void ProcessThirst(string ToolName)
+		{
+			// Drain thirst when we use a tool.
+			// I AM FINALLY USING A SWITCH TAKE THAT YANDEV
+			switch(ToolName)
+			{
+				case "Axe":
+					currentThirst -= .5f;
+				break;
+				case "Watering Can":
+					if (currentThirst < maxThirst)
+					{
+						currentThirst += 1;
+					}
+					else{break;}
+				break;
+				case "Hoe":
+					currentThirst -= .5f;
+				break;
+				case "Pickaxe":
+					currentThirst -= .5f;
+				break;
+				/*case "Fishing Rod":
+					currentThirst -= ;
+				break;
+				case "Shears":
+				break;
+				case "Milk Pail":
+				break;*/
+			}
+			Console.WriteLine(ToolName);
+			
+		}
+		
+		public void recoverHungerAndThirst(StardewValley.Item eatedItem)
+		{
+			string foodID = eatedItem.ItemId;
+			Console.WriteLine(foodID);
+			int[] hungyAndThirst = healValues.ediblesListAndValues(foodID);
+			
+			
+			currentHunger += (float)hungyAndThirst[0];
+			if (currentHunger > maxHunger)
+			{
+				currentHunger = maxHunger;
+			}
+			currentThirst += (float)hungyAndThirst[1]; // Add the values from the edibles function.
+			if (currentThirst > maxThirst)
+			{
+				// Make sure hunger and thirst don't exceed the maximum.
+				currentThirst = maxThirst;
+			}
+		}
+		
+		public void HungerPenalty()
+		{
+			// Placeholder for when we remember what having low hunger does to you.
+		}
+		public void ThirstPenalty()
+		{
+			// Also placeholder
+		}
+    }	
+}

@@ -1,0 +1,10 @@
+{
+  "Name": "sdvHotdogChamp",
+  "Author": "s",
+  "Version": "1.0.0",
+  "Description": "a hunger mod made at gunpoint",
+  "UniqueID": "s.hotdogchamp",
+  "EntryDll": "sdvHotdogChamp.dll",
+  "MinimumApiVersion": "4.0.0",
+  "UpdateKeys": []
+}

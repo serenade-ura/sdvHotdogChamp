@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "r3rFlhlpawY=",
+  "success": true,
+  "projectFilePath": "/home/serenade/Desktop/sdvHotdogChamp/sdvHotdogChamp.csproj",
+  "expectedPackageFiles": [
+    "/home/serenade/.nuget/packages/pathoschild.stardew.modbuildconfig/4.4.0/pathoschild.stardew.modbuildconfig.4.4.0.nupkg.sha512"
+  ],
+  "logs": []
+}
