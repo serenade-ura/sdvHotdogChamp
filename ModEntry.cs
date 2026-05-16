@@ -7,8 +7,10 @@ using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewModdingAPI.Utilities;
 using StardewValley;
+using StardewValley.Buffs;
 using Color = Microsoft.Xna.Framework.Color;
 using healList; // Contains the Edibles class. I don't know if this is the "right" way to do it but its the only way that would work... But I think I just fucked up the first time.
+
 
 namespace sdvHotdogChamp
 {
@@ -22,10 +24,19 @@ namespace sdvHotdogChamp
 		public static Texture2D thorstMeter;
 		public static Texture2D thorstMeterFiller;
 		public Edibles healValues = new Edibles(); // Make an object of the class here so we can use it later.
+		public hungySave readingRainbow { get; set; }
 		
 		public static string ToolUsedName;
+		public static char ToolCategory;
+		public static string QualifiedTool;
 		public static bool AlreadyUsingTool;
 		public static bool AlreadyEating;
+		public static bool hungerPenaltyFlag = false;
+		public static bool thirstPenaltyFlag = false;
+		public static bool starvingFlag = false;
+		public static bool parchedFlag = false;
+		public static bool stuffedFlag = false;
+		public static bool moistenedFlag = false;
 		
 		
 		// Variables used in the Bars code.
@@ -34,8 +45,16 @@ namespace sdvHotdogChamp
 		public static float currentHunger = 100; // So rather than "hunger" and "thirst" its more like fullness and uh... quenched I guess.
 		public static float maxHunger = 100; // Maximum reachable thirst and hunger. If current == these, you're maxed out.
 		public static float maxThirst = 100; // Since the maximum is 100, maybe I would never be trying to divide by 0 but idgaf
+		public static float minHunger = 0;
+		public static float minThirst = 0;
 		public static Color hungerColor = new Color(1, .7f, 0); // Honestly no clue what these colors are but its what survivalistic used.
         public static Color thirstColor = new Color(0,.7f, 1);
+        public Buff thorsty;
+        public Buff hungy;
+        public Buff parched;
+        public Buff starved;
+        public Buff moistened;
+        public Buff stuffed;
         
         
         public override void Entry(IModHelper helper)
@@ -49,11 +68,73 @@ namespace sdvHotdogChamp
 			hungyMeter.Name = "hungyMeter";
 			thorstMeter = helper.ModContent.Load<Texture2D>("assets/thorst.png");
 			thorstMeter.Name = "thorstMeter";
-			// Event Handler for the Rednered Event, calling "DrawBars" function.
+			
+			
+			
+			// Handle save functions
+			
+			helper.Events.GameLoop.SaveLoaded += this.CheckSave;
+			helper.Events.GameLoop.Saving += this.WriteSave;
+			
+			// Event Handler for the Rednered Event, calling "DrawBars" function.			
 			helper.Events.Display.RenderingHud += this.DrawBars;
 			helper.Events.GameLoop.TimeChanged += this.ProcessHunger;
+			helper.Events.GameLoop.TimeChanged += this.StuffedBuff;
 			helper.Events.GameLoop.UpdateTicked += this.CheckToolUse;
 			helper.Events.GameLoop.UpdateTicked += this.CheckEatedGoods;
+			helper.Events.GameLoop.UpdateTicked += this.HungerPenalty;
+			helper.Events.GameLoop.UpdateTicked += this.ThirstPenalty;
+			helper.Events.GameLoop.UpdateTicked += this.HungerThirstZeroer;
+			
+			thorsty = new Buff(
+			id: "sdvHotdogChamp_thirsty",
+			displayName: "Thorsty",
+			iconTexture: this.Helper.ModContent.Load<Texture2D>("assets/thirstyDebuff.png"),
+			iconSheetIndex: 0,
+			duration: Buff.ENDLESS
+	
+			);
+			parched = new Buff(
+			id: "anything",
+			displayName: "Parched",
+			iconTexture: this.Helper.ModContent.Load<Texture2D>("assets/parchedDebuff.png"),
+			iconSheetIndex: 0,
+			duration: Buff.ENDLESS
+
+			);
+			hungy = new Buff(
+			id: "sdvHotdogChamp_hungy",
+			displayName: "Hungy",
+			iconTexture: this.Helper.ModContent.Load<Texture2D>("assets/hungyDebuff.png"),
+			iconSheetIndex: 0,
+			duration: Buff.ENDLESS
+			);
+			starved = new Buff(
+			id: "sdvHotdogChamp_starved",
+			displayName: "Starved",
+			iconTexture: this.Helper.ModContent.Load<Texture2D>("assets/starvedDebuff.png"),
+			iconSheetIndex: 0,
+			duration: Buff.ENDLESS
+			);
+			stuffed = new Buff(
+			id: "sdvHotdogChamp_stuffed",
+			displayName: "Stuffed",
+			iconTexture: this.Helper.ModContent.Load<Texture2D>("assets/starvedDebuff.png"),
+			iconSheetIndex: 0,
+			duration: Buff.ENDLESS
+			);
+			moistened = new Buff(
+			id: "sdvHotdogChamp_moistened",
+			displayName: "Moistened",
+			iconTexture: this.Helper.ModContent.Load<Texture2D>("assets/starvedDebuff.png"),
+			iconSheetIndex: 0,
+			duration: Buff.ENDLESS,
+			effects: new BuffEffects()
+			{
+				Speed = { 1 }
+			}
+			
+			);
           
 		}
         
@@ -100,8 +181,7 @@ namespace sdvHotdogChamp
 			// Set up a vector for the thirst bar position as well. This draws it right next to the hunger bar.
 			Vector2 thirstBarPosition = new Vector2(hungerBarPosition.X+(4*hungyMeter.Width)+ 8, hungerBarPosition.Y);
 			
-			
-			
+
 			// This actually draws the hunger bar or whatever other sprite you want to draw. 
 			// The format is (sprite asset, vector position, source rectangle (whatever that means), the color (whatever that does), the rotation of the sprite (if any), the scale (1 is the original sprite size), Sprite effects (whatever that is...), and finally the layer depth... Whatever that is.)
 			// The scale is 4, if you want it to match the inbuilt UI scale... I guess? It works.
@@ -184,6 +264,7 @@ namespace sdvHotdogChamp
 			
 		}
 		
+		// CheckToolUse does what it says on the tin - per tick, check if the player used a tool. 
 		public void CheckToolUse(object? sender, UpdateTickedEventArgs e)
 		{	
 			if (!Context.IsWorldReady)
@@ -193,7 +274,9 @@ namespace sdvHotdogChamp
 					
 			if (Game1.player.UsingTool)
 			{
-				ToolUsedName = Game1.player.CurrentTool.BaseName;
+				ToolUsedName = Game1.player.CurrentTool.BaseName; // Gets the base name of the tool, ie "Axe" or "Watering Can"
+				QualifiedTool = Game1.player.CurrentTool.QualifiedItemId; 
+				ToolCategory = QualifiedTool[1];
 				AlreadyUsingTool = true;
 			}
 			else
@@ -202,11 +285,38 @@ namespace sdvHotdogChamp
 				{
 					AlreadyUsingTool = false; // Presumably this is because the update ticked goes too fast.
 					ProcessThirst(ToolUsedName);
+					
+					if (ToolCategory == 'W')
+					{// Don't
+					}
+					else
+					{
+						if (thirstPenaltyFlag)
+						{
+							Game1.player.stamina -= 1;
+						}
+						if (hungerPenaltyFlag)
+						{
+							Game1.player.stamina -= 1;
+						}
+						if (hungerPenaltyFlag && thirstPenaltyFlag)
+						{
+							Game1.player.stamina -= 1;
+						}
+						if (starvingFlag)
+						{
+							Game1.player.stamina -= 1;
+						}
+						if (parchedFlag)
+						{
+							Game1.player.stamina -= 1;
+						}
+					}
 				}
 			}
 		}
 		
-		
+		// CheckEatedGoods is a funny way of saying "see if the player ate something". 
 		public void CheckEatedGoods(object? sender, UpdateTickedEventArgs e)
 		{	
 			if (!Context.IsWorldReady)
@@ -214,7 +324,7 @@ namespace sdvHotdogChamp
 				return;
 			}
 			
-			var eatenObject = (Game1.player.itemToEat);	// Survivalistic code. Who knows!
+			var eatenObject = (Game1.player.itemToEat);	// itemToEat is an object - we'll be passing it to our recovery function.
 			if (Game1.player.isEating)
 			{
 				AlreadyEating = true;
@@ -229,6 +339,8 @@ namespace sdvHotdogChamp
 			}
 		}
 		
+		
+		// Every time the game clock updates (every 10 in-game minutes), ProcessHunger processes hunger. 
 		public void ProcessHunger(object? sender, TimeChangedEventArgs e)
 		{
 			if (!Context.IsWorldReady || Game1.eventUp) // Let's not do this until the world is ready or else this draws on the title screen.
@@ -239,49 +351,85 @@ namespace sdvHotdogChamp
 			// Almost 20, in fact! It isn't an even number, unfortunately. 
 			
 		}
+		public void StuffedBuff(object? sender, TimeChangedEventArgs e)
+		{
+			if (stuffedFlag)
+			{
+				Game1.player.stamina += 1;
+			}
+			if (moistenedFlag)
+			{
+				currentThirst -= 1;
+			}
+		}
 		#nullable disable
 		
+		// ProcessThirst is dependent on player action - you do not get thirstier as time goes on... Unless we change it.
 		public void ProcessThirst(string ToolName)
 		{
 			// Drain thirst when we use a tool.
 			// I AM FINALLY USING A SWITCH TAKE THAT YANDEV
-			switch(ToolName)
+			
+			// Thirst drain is very small to make sure it does not outrun stamina at the beginning of the game and to be sure that it ends up being a pain in the ass as you get stamina-er.
+			if (currentThirst == 0)
+			{//don't
+			}
+			else
 			{
-				case "Axe":
-					currentThirst -= .5f;
-				break;
-				case "Watering Can":
-					if (currentThirst < maxThirst)
-					{
-						currentThirst += 1;
-					}
-					else{break;}
-				break;
-				case "Hoe":
-					currentThirst -= .5f;
-				break;
-				case "Pickaxe":
-					currentThirst -= .5f;
-				break;
-				/*case "Fishing Rod":
-					currentThirst -= ;
-				break;
-				case "Shears":
-				break;
-				case "Milk Pail":
-				break;*/
+				switch(ToolName)
+				{
+					case "Axe":
+						currentThirst -= .5f;
+					break;
+					case "Watering Can":
+						if (currentThirst < maxThirst)
+						{
+							// For now, watering can use gives you a little back. 
+							currentThirst += 1;
+							if (currentThirst > maxThirst)
+							{
+								// Even though we already have an if statement to be sure that we don't go over the max, we have to double check here because of floating point numbers.
+								// Thanks Obama.
+								currentThirst = maxThirst;
+							}
+						}
+						else{break;}
+					break;
+					case "Hoe":
+						currentThirst -= .5f;
+					break;
+					case "Pickaxe":
+						currentThirst -= .5f;
+					break;
+					case "Scythe":
+						currentThirst -= .2f;
+					break;
+					/*case "Fishing Rod":
+						currentThirst -= ;
+					break;
+					case "Shears":
+					break;
+					case "Milk Pail":
+					break;*/
+				}
 			}
 			Console.WriteLine(ToolName);
 			
 		}
 		
+		
+		// recoverHunderAndThirst has got to be the longest named function here, right? It takes an object of StardewValley.Item. Maybe you recognize that...
 		public void recoverHungerAndThirst(StardewValley.Item eatedItem)
 		{
-			string foodID = eatedItem.ItemId;
+			string foodID = eatedItem.ItemId; // The ItemId method returns a string that equates to the item's numerical ID, except in cases where the item doesn't have a numerical ID, in which case it returns its name.
 			Console.WriteLine(foodID);
-			int[] hungyAndThirst = healValues.ediblesListAndValues(foodID);
+			int[] hungyAndThirst = healValues.ediblesListAndValues(foodID); // healValues is the other class here, in the healList namespace. It probably didn't have to be a separate namespace, but uhhhhhh
+			Console.WriteLine(hungyAndThirst[0].ToString());
+			Console.WriteLine(hungyAndThirst[1].ToString());
+			// Anyway, hungyAndThirst is an array passed back from the ediblesListAndValues method in that class. It contains [0]: hunger and [1]: thirst.
+			// You can edit that document and recompile to customize this mod.
 			
-			
+			// Now that we have that array, we'll update currentHunger and currentThirst, plus checking to be sure we don't overdo the max.
 			currentHunger += (float)hungyAndThirst[0];
 			if (currentHunger > maxHunger)
 			{
@@ -295,13 +443,118 @@ namespace sdvHotdogChamp
 			}
 		}
 		
-		public void HungerPenalty()
+		// Hunger and thirst penalties live here. They'll be checked every step (frame?) to be sure they apply and unapply as expected.
+		// For ease of searching, I'll make sure I mention their function names: HungerPenalty
+		#nullable enable
+		public void HungerPenalty(object? sender, UpdateTickedEventArgs e)
 		{
 			// Placeholder for when we remember what having low hunger does to you.
+			if (currentHunger > 0)
+			{
+				starvingFlag = false;
+				Game1.player.buffs.Remove("sdvHotdogChamp_starved");
+			}
+			if (currentHunger <= 20)
+			{
+				hungerPenaltyFlag = true;
+				Game1.player.applyBuff(hungy);
+				if (currentHunger == 0)
+				{
+					starvingFlag = true;
+					Game1.player.applyBuff(starved);
+				}
+			}
+			if (currentHunger >= 50)
+			{
+				hungerPenaltyFlag = false;
+				Game1.player.buffs.Remove("sdvHotdogChamp_hungy");
+			}
+			if (currentHunger == maxHunger)
+			{
+				stuffedFlag = true;
+				Game1.player.applyBuff(stuffed);
+				Game1.player.applyBuff("6");
+			}
+			if (currentHunger < 80 && stuffedFlag == true)
+			{
+				stuffedFlag = false;
+				Game1.player.buffs.Remove("sdvHotdogChamp_stuffed");
+				Game1.player.buffs.Remove("6");
+			}
+			
 		}
-		public void ThirstPenalty()
+		// And ThirstPenalty
+		public void ThirstPenalty(object? sender, UpdateTickedEventArgs e)
 		{
 			// Also placeholder
+			if (currentThirst > 0)
+			{
+				parchedFlag = false;
+				Game1.player.buffs.Remove("anything");
+			}
+			if (currentThirst <= 20)
+			{
+				thirstPenaltyFlag = true;
+				Game1.player.applyBuff(thorsty);
+				if (currentThirst == 0)
+				{
+					parchedFlag = true;
+					Game1.player.applyBuff(parched);
+				}
+			}
+			if (currentThirst >= 50)
+			{
+				thirstPenaltyFlag = false;
+				Game1.player.buffs.Remove("sdvHotdogChamp_thirsty");
+			}
+			if (currentThirst == maxThirst)
+			{
+				moistenedFlag = true;
+				Game1.player.applyBuff(moistened);
+				Game1.player.applyBuff("7");
+			}
+			if (currentThirst < 90 && moistenedFlag == true)
+			{
+				moistenedFlag = false;
+				Game1.player.buffs.Remove("sdvHotdogChamp_moistened");
+				Game1.player.buffs.Remove("7");
+			}
 		}
+		
+		public void HungerThirstZeroer(object? sender, UpdateTickedEventArgs e)
+		{
+			// during all game ticks, if hunger or thirst is under 0, we want to be sure they don't stay under 0.
+			if (currentHunger < minHunger)
+			{
+				currentHunger = minHunger;
+			}
+			if (currentThirst < minThirst)
+			{
+				currentThirst = minThirst;
+			}
+		}
+		
+		public void CheckSave(object? sender, SaveLoadedEventArgs e)
+		{
+			// Check that the save data actually exists. If it doesn't, this line creates it.
+			var readingRainbow = this.Helper.Data.ReadSaveData<hungySave>("hotdogwater") ?? new hungySave();
+			// Set the current hunger and thirst values to the ones from the save data. When you start a new file, this will be whatever the constructor values are in hungySave
+			currentHunger = readingRainbow.savedHunger;
+			currentThirst = readingRainbow.savedThirst;
+		}
+		public void WriteSave(object? sender, SavingEventArgs e)
+		{
+			// load the save to be sure we actually have one. Surely we have one, if we're here at all.
+			var readingRainbow = this.Helper.Data.ReadSaveData<hungySave>("hotdogwater");
+			
+			// Before we actually save, we need to update the hungySave values to reflect our current hunger and thirst values in game.
+			// If you have brain damage and do this in reverse, well... skull emoji
+			readingRainbow.savedHunger = currentHunger;
+			readingRainbow.savedThirst = currentThirst;
+			// actually save the fucking game. gg you are now starving.
+			this.Helper.Data.WriteSaveData("hotdogwater", readingRainbow);
+		}
+
+		#nullable disable
     }	
 }

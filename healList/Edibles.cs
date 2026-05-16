@@ -24,20 +24,20 @@ namespace healList
 			{
 				case "16": //Wild Horseradish
 				{
-					healValues[0] = 4 ;
+					healValues[0] = 100 ;
 					healValues[1] = 1 ;
 					break;
 				}
 				case "18": // Daffodil
 				{
 					healValues[0] = 0 ;
-					healValues[1] = 0 ;
+					healValues[1] = 100 ;
 					break;
 				}
 				case "20": // Leek
 				{
-					healValues[0] = 0 ;
-					healValues[1] = 0 ;
+					healValues[0] = 100 ;
+					healValues[1] = 100 ;
 					break;
 				}
 				case "22": // Dandelion
@@ -78,8 +78,8 @@ namespace healList
 				}
 				case "92": // Sap
 				{
-					healValues[0] = 0 ;
-					healValues[1] = 0 ;
+					healValues[0] = -150 ;
+					healValues[1] = -100 ;
 					break;
 				}
 				case "128": // Pufferfish
