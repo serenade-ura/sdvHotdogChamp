@@ -37,6 +37,7 @@ namespace sdvHotdogChamp
 		public static bool parchedFlag = false;
 		public static bool stuffedFlag = false;
 		public static bool moistenedFlag = false;
+		public static int fishTicked = 0;
 		
 		
 		// Variables used in the Bars code.
@@ -79,7 +80,9 @@ namespace sdvHotdogChamp
 			// Event Handler for the Rednered Event, calling "DrawBars" function.			
 			helper.Events.Display.RenderingHud += this.DrawBars;
 			helper.Events.GameLoop.TimeChanged += this.ProcessHunger;
+			helper.Events.GameLoop.TimeChanged += this.FishingFucker;
 			helper.Events.GameLoop.TimeChanged += this.StuffedBuff;
+			helper.Events.GameLoop.DayEnding += this.TheNightBugs;
 			helper.Events.GameLoop.UpdateTicked += this.CheckToolUse;
 			helper.Events.GameLoop.UpdateTicked += this.CheckEatedGoods;
 			helper.Events.GameLoop.UpdateTicked += this.HungerPenalty;
@@ -275,8 +278,8 @@ namespace sdvHotdogChamp
 			if (Game1.player.UsingTool)
 			{
 				ToolUsedName = Game1.player.CurrentTool.BaseName; // Gets the base name of the tool, ie "Axe" or "Watering Can"
-				QualifiedTool = Game1.player.CurrentTool.QualifiedItemId; 
-				ToolCategory = QualifiedTool[1];
+				QualifiedTool = Game1.player.CurrentTool.QualifiedItemId; // This gets the full item ID of the used tool, including its category (W) for weapon, etc.
+				ToolCategory = QualifiedTool[1]; // QualifiedTool is a string, but we only want the one character. We're setting it here.
 				AlreadyUsingTool = true;
 			}
 			else
@@ -287,7 +290,7 @@ namespace sdvHotdogChamp
 					ProcessThirst(ToolUsedName);
 					
 					if (ToolCategory == 'W')
-					{// Don't
+					{// Let's say that you're swinging a weapon, you don't want to die of thirst.
 					}
 					else
 					{
@@ -378,39 +381,38 @@ namespace sdvHotdogChamp
 			{
 				switch(ToolName)
 				{
-					case "Axe":
+					case string toolType when toolType.Contains("Axe"):
 						currentThirst -= .5f;
 					break;
-					case "Watering Can":
-						if (currentThirst < maxThirst)
-						{
-							// For now, watering can use gives you a little back. 
-							currentThirst += 1;
-							if (currentThirst > maxThirst)
-							{
-								// Even though we already have an if statement to be sure that we don't go over the max, we have to double check here because of floating point numbers.
-								// Thanks Obama.
-								currentThirst = maxThirst;
-							}
-						}
-						else{break;}
-					break;
-					case "Hoe":
+					case string toolType when toolType.Contains("Watering Can"):
 						currentThirst -= .5f;
 					break;
-					case "Pickaxe":
+					case string toolType when toolType.Contains("Hoe"):
 						currentThirst -= .5f;
 					break;
-					case "Scythe":
+					case string toolType when toolType.Contains("Pickaxe"):
+						currentThirst -= .5f;
+					break;
+					case string toolType when toolType.Contains("Scythe"):
 						currentThirst -= .2f;
 					break;
-					/*case "Fishing Rod":
-						currentThirst -= ;
+					case string toolType when toolType.Contains("Rod"):
+						currentThirst -= (1f * (float)fishTicked);
+						fishTicked = 0;
 					break;
-					case "Shears":
+					case string toolType when toolType.Contains("Pole"):
+						currentThirst -= (1f * (float)fishTicked);
+						fishTicked = 0;
 					break;
-					case "Milk Pail":
-					break;*/
+					case string toolType when toolType.Contains("Pail"):
+						currentThirst -= .5f;
+					break;
+					case string toolType when toolType.Contains("Pan"):
+						currentThirst -= .5f;
+					break;
+					case string toolType when toolType.Contains("Shears"):
+						currentThirst -= .5f;
+					break;
 				}
 			}
 			Console.WriteLine(ToolName);
@@ -545,7 +547,7 @@ namespace sdvHotdogChamp
 		public void WriteSave(object? sender, SavingEventArgs e)
 		{
 			// load the save to be sure we actually have one. Surely we have one, if we're here at all.
-			var readingRainbow = this.Helper.Data.ReadSaveData<hungySave>("hotdogwater");
+			var readingRainbow = this.Helper.Data.ReadSaveData<hungySave>("hotdogwater") ?? new hungySave(); // what the fuck am I casting
 			
 			// Before we actually save, we need to update the hungySave values to reflect our current hunger and thirst values in game.
 			// If you have brain damage and do this in reverse, well... skull emoji
@@ -553,6 +555,32 @@ namespace sdvHotdogChamp
 			readingRainbow.savedThirst = currentThirst;
 			// actually save the fucking game. gg you are now starving.
 			this.Helper.Data.WriteSaveData("hotdogwater", readingRainbow);
+		}
+		public void FishingFucker(object? sender, TimeChangedEventArgs e)
+		{
+			// I live in a house of people who despise fishing and I think this is honestly too far
+			// sorry fisherman.
+			if (Game1.player.UsingTool)
+			{
+				string toolChecker = Game1.player.CurrentTool.BaseName; // Gets the base name of the tool, ie "Axe" or "Watering Can"
+				bool checkRod = toolChecker.Contains("Rod"); // rod inspection day
+				bool checkPole = toolChecker.Contains("Pole"); // pole inspection day too
+				if (checkRod || checkPole)
+				{
+					fishTicked += 1;
+				}
+			}
+		}
+		
+		public void TheNightBugs(object? sender, DayEndingEventArgs e)
+		{
+			// WHAT ARE THOOOOOOSE
+			// Everyone wakes up hungry, having to piss, and ultimately thirsty.
+			// farmer does too.
+			
+			// This happens before save, so these will be written by WriteSave.
+			currentHunger -= 15f;
+			currentThirst -= 15f;
 		}
 
 		#nullable disable

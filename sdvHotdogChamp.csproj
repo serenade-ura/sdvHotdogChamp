@@ -5,7 +5,7 @@
 	</PropertyGroup>
 
 	<PropertyGroup>
-		<GamePath>home/serenade/.var/app/com.valvesoftware.Steam/.local/share/Steam/steamapps/common/Stardew Valley</GamePath>
+		<GamePath>/home/serenade/.steam/debian-installation/steamapps/common/Stardew Valley</GamePath>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 	</PropertyGroup>
 
